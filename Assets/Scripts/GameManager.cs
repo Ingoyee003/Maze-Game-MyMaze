@@ -4,15 +4,19 @@ public class GameManager : MonoBehaviour
 {
     public static GameManager Instance { get; private set; }
 
-    public enum State { MainMenu, Playing, Paused, Won }
+    public enum State { MainMenu, LevelSelect, Playing, Paused, Won }
     public State CurrentState { get; private set; }
 
-    [Header("Panels - assign in Inspector")]
-    [SerializeField] GameObject mainMenuPanel;
-    [SerializeField] GameObject levelSelectPanel; // now used as the PAUSE panel - keep this field name so your existing Inspector wiring doesn't break
-    [SerializeField] GameObject hudPanel;
-    [SerializeField] GameObject winPanel;
-    [SerializeField] GameObject settingsPanel;
+    [Tooltip("Drag the Canvas here - panels are found automatically by name, no need to wire each one")]
+    [SerializeField] Transform canvasRoot;
+
+    GameObject mainMenuPanel;
+    GameObject levelSelectPanel;
+    GameObject pausePanel;
+    GameObject hudPanel;
+    GameObject winPanel;
+    GameObject settingsPanel;
+    GameObject howToPlayPanel;
 
     int currentLevelIndex = -1;
     public int CurrentLevelIndex => currentLevelIndex;
@@ -21,9 +25,42 @@ public class GameManager : MonoBehaviour
 
     void Start()
     {
+        // Resolved here (not Awake) so UIBuilder has already constructed
+        // every panel by the time we go looking for them - Start() always
+        // runs after every object's Awake() has finished.
+        mainMenuPanel = Find("MainMenuPanel");
+        levelSelectPanel = Find("LevelSelectPanel");
+        pausePanel = Find("PausePanel");
+        hudPanel = Find("HUDPanel");
+        winPanel = Find("WinPanel");
+        settingsPanel = Find("SettingsPanel");
+        howToPlayPanel = Find("HowToPlayPanel");
+
         ScoreManager.Instance.OnLevelWon += HandleLevelWon;
         Time.timeScale = 1f;
         ShowState(State.MainMenu);
+    }
+
+    GameObject Find(string name)
+    {
+        Transform t = FindDeep(canvasRoot, name);
+        if (t == null)
+        {
+            Debug.LogError($"GameManager: couldn't find a panel named '{name}' under the Canvas. Did UIBuilder run?");
+            return null;
+        }
+        return t.gameObject;
+    }
+
+    Transform FindDeep(Transform parent, string objectName)
+    {
+        foreach (Transform child in parent)
+        {
+            if (child.name == objectName) return child;
+            Transform result = FindDeep(child, objectName);
+            if (result != null) return result;
+        }
+        return null;
     }
 
     public void ShowState(State state)
@@ -31,28 +68,44 @@ public class GameManager : MonoBehaviour
         CurrentState = state;
 
         mainMenuPanel.SetActive(state == State.MainMenu);
-        levelSelectPanel.SetActive(state == State.Paused); // pause panel
+        levelSelectPanel.SetActive(state == State.LevelSelect);
+        pausePanel.SetActive(state == State.Paused);
         hudPanel.SetActive(state == State.Playing || state == State.Paused);
         winPanel.SetActive(state == State.Won);
 
-        // Settings is ALWAYS force-closed on every state change. It only
-        // opens when OnSettingsPressed() is explicitly called. This is the
-        // fix for it getting "stuck" open.
         settingsPanel.SetActive(false);
+        if (howToPlayPanel != null) howToPlayPanel.SetActive(false);
     }
 
-    // ---- Hook these to UI Button OnClick events ----
+    // ---- Main Menu buttons ----
 
-    // Play now goes straight into the maze - no separate level-select screen.
     public void OnPlayPressed()
     {
         StartLevel(LevelManager.Instance.HighestLevelReached);
+    }
+
+    public void OnOpenLevelSelectPressed() => ShowState(State.LevelSelect);
+    public void OnCloseLevelSelectPressed() => ShowState(State.MainMenu);
+
+    public void OnOpenHowToPlayPressed()
+    {
+        if (howToPlayPanel != null) howToPlayPanel.SetActive(true);
+    }
+    public void OnCloseHowToPlayPressed()
+    {
+        if (howToPlayPanel != null) howToPlayPanel.SetActive(false);
     }
 
     public void OnSettingsPressed() => settingsPanel.SetActive(true);
     public void OnCloseSettingsPressed() => settingsPanel.SetActive(false);
 
     public void OnQuitPressed() => Application.Quit();
+
+    public void OnLevelSelected(int levelIndex)
+    {
+        if (!LevelManager.Instance.IsUnlocked(levelIndex)) return;
+        StartLevel(levelIndex);
+    }
 
     void StartLevel(int levelIndex)
     {
@@ -77,37 +130,25 @@ public class GameManager : MonoBehaviour
         ShowState(State.Won);
     }
 
-    // Endless mode: there's no final level, so this always advances.
-    public void OnNextLevelPressed()
-    {
-        StartLevel(currentLevelIndex + 1);
-    }
+    public void OnNextLevelPressed() => StartLevel(currentLevelIndex + 1);
+    public void OnRestartLevelPressed() => StartLevel(currentLevelIndex);
 
-    // ---- Pause menu (mid-game) - wire these to the Pause panel's buttons ----
+    // ---- Pause menu ----
 
-    // Wire to a new Pause button on the HUD.
     public void OnPausePressed()
     {
         if (CurrentState != State.Playing) return;
         ShowState(State.Paused);
-        Time.timeScale = 0f; // freezes movement AND the timer while paused
+        Time.timeScale = 0f;
     }
 
-    // Wire the pause panel's "Resume"/"Continue" button to this.
     public void OnResumePressed()
     {
         Time.timeScale = 1f;
         ShowState(State.Playing);
     }
 
-    // Wire the pause panel's "Quit"/"Back" button to this.
     public void OnQuitToMenuPressed()
-    {
-        Time.timeScale = 1f;
-        ShowState(State.MainMenu);
-    }
-
-    public void OnBackToMainMenu()
     {
         Time.timeScale = 1f;
         ShowState(State.MainMenu);

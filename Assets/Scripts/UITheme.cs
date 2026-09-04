@@ -14,7 +14,11 @@ public class UITheme : MonoBehaviour
         // Light, minimal background + white cards (like the reference design)
         public static Color BackgroundLight = Hex("F3F7F5");
         public static Color CardWhite = Hex("FFFFFF");
-        public static Color HUDOverlay = HexA("FFFFFF", 235);
+        // HUDPanel itself should have NO visible background - it's just a
+        // container. The maze needs to show through fully. Individual HUD
+        // elements (timer text, D-pad buttons) already have their own
+        // backgrounds, so the panel's own Image should be fully transparent.
+        public static Color HUDOverlay = HexA("FFFFFF", 0);
 
         public static Color PrimaryGreen = Hex("4CAF7D");   // main CTA buttons (Play, Continue, Resume)
         public static Color SecondaryMint = Hex("A7E3C5");  // secondary actions (Settings, D-pad)
@@ -92,8 +96,18 @@ public class UITheme : MonoBehaviour
         var img = t.GetComponent<Image>();
         if (img == null) return;
 
+        if (rounded)
+        {
+            RoundedUI.ApplyRoundedStyle(img, panelCornerRadius);
+        }
+        else
+        {
+            // Unity's default "Background" UI sprite has its own grey tint
+            // baked in, so setting color alone still looks grey. Clearing
+            // the sprite makes it a plain solid-color fill instead.
+            img.sprite = null;
+        }
         img.color = color;
-        if (rounded) RoundedUI.ApplyRoundedStyle(img, panelCornerRadius);
     }
 
     void StyleButton(string objectName, Color bgColor, Color textColor)

@@ -6,7 +6,15 @@ using System.Collections;
 // reports the player reached the exit, with a little punch-scale for flair.
 public class WinPanelDisplay : MonoBehaviour
 {
-    [SerializeField] TMP_Text resultText;
+    TMP_Text timeValueText;
+    TMP_Text scoreValueText;
+
+    // Wired by UIBuilder in code - no manual Inspector dragging needed.
+    public void SetReferences(TMP_Text timeValue, TMP_Text scoreValue)
+    {
+        timeValueText = timeValue;
+        scoreValueText = scoreValue;
+    }
 
     void OnEnable()
     {
@@ -22,16 +30,16 @@ public class WinPanelDisplay : MonoBehaviour
 
     void ShowResult(int score, float time)
     {
-        if (resultText == null) return;
+        if (timeValueText != null) timeValueText.text = $"{time:F1}s";
+        if (scoreValueText != null) scoreValueText.text = score.ToString();
 
-        resultText.text = $"Score: {score}\nTime: {time:F1}s";
         StopCoroutine(nameof(PunchScale));
         StartCoroutine(PunchScale());
     }
 
     IEnumerator PunchScale()
     {
-        Transform t = resultText.transform;
+        Transform t = transform;
         Vector3 baseScale = Vector3.one;
         t.localScale = baseScale * 0.5f;
 
@@ -42,8 +50,7 @@ public class WinPanelDisplay : MonoBehaviour
         {
             elapsed += Time.unscaledDeltaTime;
             float progress = elapsed / duration;
-            // Overshoot then settle - a classic "pop in" feel.
-            float scale = Mathf.Sin(progress * Mathf.PI * 0.5f) * 1.15f;
+            float scale = Mathf.Sin(progress * Mathf.PI * 0.5f) * 1.05f;
             t.localScale = baseScale * scale;
             yield return null;
         }

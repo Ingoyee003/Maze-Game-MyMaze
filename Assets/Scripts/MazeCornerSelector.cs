@@ -12,6 +12,8 @@ public class MazeCornerSelector : MonoBehaviour
     [Tooltip("Optional - a HUD text object shown while the player is choosing a starting corner")]
     [SerializeField] TMP_Text hintText;
 
+    public void SetHintText(TMP_Text text) => hintText = text;
+
     List<Room> corners = new List<Room>();
     bool selectionActive = false;
 

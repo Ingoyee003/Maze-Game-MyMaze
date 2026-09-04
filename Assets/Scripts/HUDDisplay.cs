@@ -2,22 +2,35 @@ using UnityEngine;
 using TMPro;
 
 // Attach this to the HUDPanel object. It listens to ScoreManager's events
-// and keeps the Timer/Score text on screen updated automatically.
+// and keeps the Timer/Score/Level text on screen updated automatically.
 public class HUDDisplay : MonoBehaviour
 {
-    [SerializeField] TMP_Text timerText;
-    [SerializeField] TMP_Text scoreText;
+    TMP_Text timerText;
+    TMP_Text scoreText;
+    TMP_Text levelText;
+
+    // Wired by UIBuilder in code - no manual Inspector dragging needed.
+    public void SetReferences(TMP_Text timer, TMP_Text score, TMP_Text level)
+    {
+        timerText = timer;
+        scoreText = score;
+        levelText = level;
+    }
 
     void OnEnable()
     {
         if (ScoreManager.Instance != null)
             ScoreManager.Instance.OnTimerTick += UpdateTimer;
+        if (GenerateMaze.Instance != null)
+            GenerateMaze.Instance.OnMazeGenerated += UpdateLevel;
     }
 
     void OnDisable()
     {
         if (ScoreManager.Instance != null)
             ScoreManager.Instance.OnTimerTick -= UpdateTimer;
+        if (GenerateMaze.Instance != null)
+            GenerateMaze.Instance.OnMazeGenerated -= UpdateLevel;
     }
 
     void UpdateTimer(float elapsed)
@@ -26,8 +39,12 @@ public class HUDDisplay : MonoBehaviour
             timerText.text = $"Time: {elapsed:F1}";
     }
 
-    // Call this from GameManager/WinPanel when a level is won, or leave
-    // ScoreText showing the last value - your call.
+    void UpdateLevel()
+    {
+        if (levelText != null && GameManager.Instance != null)
+            levelText.text = $"Level {GameManager.Instance.CurrentLevelIndex + 1}";
+    }
+
     public void SetScore(int score)
     {
         if (scoreText != null)
