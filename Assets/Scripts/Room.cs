@@ -25,6 +25,12 @@ public class Room : MonoBehaviour
     [Tooltip("A flag/marker shown once this room is chosen as the exit")]
     [SerializeField] GameObject exitMarker;
 
+    [Header("Decorative corner-fill pieces (optional - the diagonal pieces at wall intersections)")]
+    [SerializeField] GameObject cornerTopLeft;
+    [SerializeField] GameObject cornerTopRight;
+    [SerializeField] GameObject cornerBottomLeft;
+    [SerializeField] GameObject cornerBottomRight;
+
     [Header("Theming (optional - for visual polish)")]
     [Tooltip("The floor/background sprite of this room (e.g. the 'Square' child)")]
     [SerializeField] SpriteRenderer floorRenderer;
@@ -64,6 +70,21 @@ public class Room : MonoBehaviour
             wall.SetActive(false);
     }
 
+    // Hides one decorative diagonal filler piece. These sit where two walls
+    // meet; when the adjacent walls are hidden (outer boundary) the piece is
+    // left floating and makes the room look like a sealed box even though
+    // it's open, so boundary rooms hide their outward-facing pieces.
+    public void HideCornerDecoration(bool left, bool top)
+    {
+        GameObject piece =
+            left && top ? cornerTopLeft :
+            !left && top ? cornerTopRight :
+            left ? cornerBottomLeft :
+            cornerBottomRight;
+
+        if (piece != null) piece.SetActive(false);
+    }
+
     public void SetDirFlag(Directions dir, bool flag)
     {
         wallActive[dir] = flag;
@@ -82,6 +103,8 @@ public class Room : MonoBehaviour
     // doesn't look like flat default-grey boxes.
     public void ApplyTheme(Color wallColor, Color floorColor)
     {
+
+
         if (floorRenderer != null)
             floorRenderer.color = floorColor;
 
@@ -95,12 +118,38 @@ public class Room : MonoBehaviour
 
     public void ShowAsCornerOption(bool show)
     {
-        if (cornerHighlight == null) return;
-
+        EnsureCornerHighlight();
         cornerHighlight.SetActive(show);
 
         if (pulseRoutine != null) StopCoroutine(pulseRoutine);
         if (show) pulseRoutine = StartCoroutine(PulseHighlight());
+    }
+
+    // If nobody wired a cornerHighlight in the prefab, build a simple glowing
+    // dot via code so this always works regardless of manual Editor setup.
+    void EnsureCornerHighlight()
+    {
+        if (cornerHighlight != null) return;
+
+        Color yellow = new Color(1f, 0.85f, 0.2f, 0.9f);
+
+        GameObject glow = new GameObject("CornerGlow_Auto");
+        glow.transform.SetParent(transform, false);
+        var glowSr = glow.AddComponent<SpriteRenderer>();
+        glowSr.sprite = RoundedUI.CreateGlowSprite(96, new Color(yellow.r, yellow.g, yellow.b, 0.5f));
+        glowSr.sortingOrder = 9;
+        glow.transform.localScale = Vector3.one * 1.6f;
+
+        GameObject go = new GameObject("CornerHighlight_Auto");
+        go.transform.SetParent(glow.transform, false);
+        go.transform.localPosition = Vector3.zero;
+
+        var sr = go.AddComponent<SpriteRenderer>();
+        sr.sprite = RoundedUI.CreateRoundedRect(64, 32, yellow); // full radius = circle
+        sr.sortingOrder = 10; // draw above walls/floor
+        go.transform.localScale = Vector3.one * 0.4f; // relative to the glow parent's 1.6x scale
+
+        cornerHighlight = glow;
     }
 
     // A gentle pulsing scale so the tappable corners actually catch the eye
@@ -118,7 +167,33 @@ public class Room : MonoBehaviour
 
     public void ShowAsExit(bool show)
     {
-        if (exitMarker != null) exitMarker.SetActive(show);
+        EnsureExitMarker();
+        exitMarker.SetActive(show);
+    }
+
+    void EnsureExitMarker()
+    {
+        if (exitMarker != null) return;
+
+        Color red = new Color(1f, 0.3f, 0.3f, 0.8f);
+
+        GameObject glow = new GameObject("ExitGlow_Auto");
+        glow.transform.SetParent(transform, false);
+        var glowSr = glow.AddComponent<SpriteRenderer>();
+        glowSr.sprite = RoundedUI.CreateGlowSprite(96, new Color(red.r, red.g, red.b, 0.5f));
+        glowSr.sortingOrder = 9;
+        glow.transform.localScale = Vector3.one * 1.6f;
+
+        GameObject go = new GameObject("ExitMarker_Auto");
+        go.transform.SetParent(glow.transform, false);
+        go.transform.localPosition = Vector3.zero;
+
+        var sr = go.AddComponent<SpriteRenderer>();
+        sr.sprite = RoundedUI.CreateRoundedRect(64, 32, red); // small red dot - "exit here"
+        sr.sortingOrder = 10;
+        go.transform.localScale = Vector3.one * 0.3f; // relative to the glow parent's 1.6x scale
+
+        exitMarker = glow;
     }
 
     // Requires a Collider2D on this GameObject (or a child). Works for mouse

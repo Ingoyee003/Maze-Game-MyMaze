@@ -16,19 +16,13 @@ public class WinPanelDisplay : MonoBehaviour
         scoreValueText = scoreValue;
     }
 
-    void OnEnable()
-    {
-        if (ScoreManager.Instance != null)
-            ScoreManager.Instance.OnLevelWon += ShowResult;
-    }
-
-    void OnDisable()
-    {
-        if (ScoreManager.Instance != null)
-            ScoreManager.Instance.OnLevelWon -= ShowResult;
-    }
-
-    void ShowResult(int score, float time)
+    // Called DIRECTLY by GameManager right after it activates this panel -
+    // NOT via the OnLevelWon event. The event fires GameManager's own
+    // handler first, which is what activates this panel; a listener added
+    // here via OnEnable() would subscribe too late to catch that same
+    // firing (it'd only work from the second win onward). Calling this
+    // directly sidesteps that entirely.
+    public void ShowResult(int score, float time)
     {
         if (timeValueText != null) timeValueText.text = $"{time:F1}s";
         if (scoreValueText != null) scoreValueText.text = score.ToString();

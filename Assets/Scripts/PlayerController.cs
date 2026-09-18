@@ -31,6 +31,19 @@ public class PlayerController : MonoBehaviour
         canMove = true;
     }
 
+    // Called by GameManager right before a new maze is generated - hides
+    // the player and disables movement until the player picks a fresh
+    // corner in the NEW maze. Without this, the player stayed visible and
+    // movable using the PREVIOUS maze's walls/position.
+    public void ResetForNewLevel()
+    {
+        canMove = false;
+        moving = false;
+        currentRoom = null;
+        StopAllCoroutines();
+        if (visual != null) visual.SetVisible(false);
+    }
+
     void Update()
     {
         if (!canMove || moving) return;
@@ -62,6 +75,8 @@ public class PlayerController : MonoBehaviour
                 CameraController.Instance.Shake();
             if (visual != null)
                 visual.PlayBumpEffect();
+            if (PlayerPrefs.GetInt("VibrationEnabled", 1) == 1)
+                Handheld.Vibrate(); // no-op in the Editor, works on a real device
             return;
         }
 

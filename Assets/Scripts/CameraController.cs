@@ -24,6 +24,14 @@ public class CameraController : MonoBehaviour
         Instance = this;
         cam = GetComponent<Camera>();
 
+        // Reserve space for the HUD's top/bottom bars (matches the bar
+        // heights UIBuilder uses, out of the 1920-tall reference canvas) so
+        // the maze camera only renders in the strip between them - this is
+        // what keeps the maze's start/end from hiding behind the HUD bars.
+        const float topBarFraction = 170f / 1920f;
+        const float bottomBarFraction = 480f / 1920f;
+        cam.rect = new Rect(0, bottomBarFraction, 1, 1 - topBarFraction - bottomBarFraction);
+
         // Self-heal: if the scene was saved with a broken (zero/negative)
         // orthographic size, snap it back to something sane immediately.
         if (cam.orthographicSize <= 0.01f)

@@ -96,10 +96,33 @@ public class GameManager : MonoBehaviour
         if (howToPlayPanel != null) howToPlayPanel.SetActive(false);
     }
 
-    public void OnSettingsPressed() => settingsPanel.SetActive(true);
-    public void OnCloseSettingsPressed() => settingsPanel.SetActive(false);
+    public void OnSettingsPressed()
+    {
+        mainMenuPanel.SetActive(false);
+        pausePanel.SetActive(false);
+        hudPanel.SetActive(false);
+        settingsPanel.SetActive(true);
+    }
 
-    public void OnQuitPressed() => Application.Quit();
+    public void OnCloseSettingsPressed()
+    {
+        settingsPanel.SetActive(false);
+        mainMenuPanel.SetActive(CurrentState == State.MainMenu);
+        pausePanel.SetActive(CurrentState == State.Paused);
+        hudPanel.SetActive(CurrentState == State.Playing || CurrentState == State.Paused);
+    }
+
+    public void OnQuitPressed()
+    {
+        // Application.Quit() does nothing while testing inside the Unity
+        // Editor (only works in a real build) - this makes Exit actually
+        // stop Play mode so it "works" during testing too.
+#if UNITY_EDITOR
+        UnityEditor.EditorApplication.isPlaying = false;
+#else
+        Application.Quit();
+#endif
+    }
 
     public void OnLevelSelected(int levelIndex)
     {
@@ -113,6 +136,12 @@ public class GameManager : MonoBehaviour
         var (width, height, loopChance) = LevelManager.Instance.GetLevelParams(levelIndex);
 
         ShowState(State.Playing);
+
+        // Reset the player BEFORE generating the new maze - otherwise it
+        // stays visible/movable from the previous level (stale position,
+        // stale walls) until a fresh corner is picked.
+        if (PlayerController.Instance != null)
+            PlayerController.Instance.ResetForNewLevel();
 
         GenerateMaze.Instance.Initialize(width, height);
         CameraController.Instance.FitToMaze(
@@ -128,6 +157,12 @@ public class GameManager : MonoBehaviour
     {
         LevelManager.Instance.ReportResult(currentLevelIndex, score);
         ShowState(State.Won);
+
+        // Push the result straight into the Win panel - see the comment on
+        // WinPanelDisplay.ShowResult for why this can't go through the
+        // OnLevelWon event itself.
+        var winDisplay = winPanel.GetComponent<WinPanelDisplay>();
+        if (winDisplay != null) winDisplay.ShowResult(score, time);
     }
 
     public void OnNextLevelPressed() => StartLevel(currentLevelIndex + 1);

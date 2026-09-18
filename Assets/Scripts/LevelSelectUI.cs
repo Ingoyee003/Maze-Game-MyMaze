@@ -11,8 +11,8 @@ public class LevelSelectUI : MonoBehaviour
     [Tooltip("The 'Content' object inside your Scroll View - needs a Grid Layout Group component")]
     [SerializeField] Transform gridContent;
 
-    [Tooltip("How many locked levels to preview beyond the furthest one reached")]
-    [SerializeField] int showAheadOfUnlocked = 15;
+    [Tooltip("Total levels to list (capped so it doesn't generate an unbounded number of buttons)")]
+    [SerializeField] int maxLevelsToShow = 500;
 
     public void SetGridContent(Transform content) => gridContent = content;
 
@@ -33,11 +33,15 @@ public class LevelSelectUI : MonoBehaviour
         foreach (Transform child in gridContent)
             Destroy(child.gameObject);
 
-        int highest = LevelManager.Instance.HighestLevelReached;
-        int totalToShow = highest + showAheadOfUnlocked + 1;
+        int totalToShow = maxLevelsToShow;
 
         for (int i = 0; i < totalToShow; i++)
             CreateLevelButton(i);
+
+        // Runtime-created Layout Groups don't always recalculate on the
+        // same frame - force it immediately so the grid isn't blank.
+        Canvas.ForceUpdateCanvases();
+        LayoutRebuilder.ForceRebuildLayoutImmediate(gridContent as RectTransform);
     }
 
     void CreateLevelButton(int levelIndex)

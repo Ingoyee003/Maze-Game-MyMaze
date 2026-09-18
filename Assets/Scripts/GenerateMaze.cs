@@ -18,8 +18,8 @@ public class GenerateMaze : MonoBehaviour
     float roomHeight;
 
     [Header("Maze visuals")]
-    [SerializeField] Color wallColor = new Color(0.91f, 0.96f, 0.97f);   // light, catches light against dark floor
-    [SerializeField] Color floorColor = new Color(0.14f, 0.16f, 0.24f); // dark navy floor, matches UI theme
+    [SerializeField] Color wallColor = new Color(0.85f, 0.95f, 1f);     // cool light blue-white, catches the glow
+    [SerializeField] Color floorColor = new Color(0.08f, 0.1f, 0.18f); // deeper navy, more contrast for the glow to read against
 
     public float RoomWidth => roomWidth;
     public float RoomHeight => roomHeight;
@@ -67,7 +67,32 @@ public class GenerateMaze : MonoBehaviour
 
         GetRoomSize();
         BuildGrid();
+        BuildBackgroundGlow();
         CreateMaze();
+    }
+
+    GameObject backgroundGlow;
+
+    // A big soft radial glow behind the whole maze - dark navy floor with a
+    // gentle lighter/tinted glow near the center, instead of a flat color.
+    // This is the main thing that gives the "premium/atmospheric" feel.
+    void BuildBackgroundGlow()
+    {
+        if (backgroundGlow != null) Destroy(backgroundGlow);
+
+        backgroundGlow = new GameObject("BackgroundGlow");
+        backgroundGlow.transform.SetParent(transform, false);
+
+        float centerX = (NumX * roomWidth - roomWidth) / 2f;
+        float centerY = (NumY * roomHeight - roomHeight) / 2f;
+        backgroundGlow.transform.position = new Vector3(centerX, centerY, 0.1f); // slightly behind everything
+
+        var sr = backgroundGlow.AddComponent<SpriteRenderer>();
+        sr.sprite = RoundedUI.CreateGlowSprite(256, new Color(0.35f, 0.55f, 0.75f, 0.35f));
+        sr.sortingOrder = -10;
+
+        float span = Mathf.Max(NumX * roomWidth, NumY * roomHeight);
+        backgroundGlow.transform.localScale = Vector3.one * (span * 1.4f / 2.56f); // glow sprite is 256px @ 100 PPU = 2.56 world units wide
     }
 
     void BuildGrid()
@@ -227,6 +252,7 @@ public class GenerateMaze : MonoBehaviour
         yield return null;
 
         generating = false;
+        EnsureCornersReachable();
         HideOuterBoundary();
         OnMazeGenerated?.Invoke();
     }
@@ -240,12 +266,47 @@ public class GenerateMaze : MonoBehaviour
         {
             rooms[i, 0].HideWallVisual(Room.Directions.BOTTOM);
             rooms[i, NumY - 1].HideWallVisual(Room.Directions.TOP);
+
+            // Both bottom-facing decorations on the bottom row, both
+            // top-facing ones on the top row - otherwise these little
+            // filler squares stay floating where the hidden boundary wall
+            // used to be, which is what makes corners look sealed.
+            rooms[i, 0].HideCornerDecoration(true, false);
+            rooms[i, 0].HideCornerDecoration(false, false);
+            rooms[i, NumY - 1].HideCornerDecoration(true, true);
+            rooms[i, NumY - 1].HideCornerDecoration(false, true);
         }
         for (int j = 0; j < NumY; j++)
         {
             rooms[0, j].HideWallVisual(Room.Directions.LEFT);
             rooms[NumX - 1, j].HideWallVisual(Room.Directions.RIGHT);
+
+            rooms[0, j].HideCornerDecoration(true, true);
+            rooms[0, j].HideCornerDecoration(true, false);
+            rooms[NumX - 1, j].HideCornerDecoration(false, true);
+            rooms[NumX - 1, j].HideCornerDecoration(false, false);
         }
+    }
+
+    // Defensive: the generator always connects every cell, but a corner room
+    // can still end up with its ONE opening facing an outer edge, which the
+    // player can't actually walk through. This guarantees each of the four
+    // corners has at least one opening pointing INTO the maze.
+    void EnsureCornersReachable()
+    {
+        OpenCornerIfSealed(0, 0, Room.Directions.TOP, Room.Directions.RIGHT);
+        OpenCornerIfSealed(NumX - 1, 0, Room.Directions.TOP, Room.Directions.LEFT);
+        OpenCornerIfSealed(0, NumY - 1, Room.Directions.BOTTOM, Room.Directions.RIGHT);
+        OpenCornerIfSealed(NumX - 1, NumY - 1, Room.Directions.BOTTOM, Room.Directions.LEFT);
+    }
+
+    void OpenCornerIfSealed(int x, int y, Room.Directions a, Room.Directions b)
+    {
+        Room room = rooms[x, y];
+        if (!room.HasWall(a) || !room.HasWall(b)) return; // already open one way
+
+        // Both interior sides are walled - knock one out at random.
+        RemoveRoomWall(x, y, UnityEngine.Random.value < 0.5f ? a : b);
     }
 
     void ResetWalls()

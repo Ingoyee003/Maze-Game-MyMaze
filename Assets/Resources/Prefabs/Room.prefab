@@ -338,6 +338,10 @@ MonoBehaviour:
   rightWall: {fileID: 566552883354233722}
   cornerHighlight: {fileID: 5934418848282146135}
   exitMarker: {fileID: 7314305371633121529}
+  cornerTopLeft: {fileID: 8594405891870707215}
+  cornerTopRight: {fileID: 5648036042866582255}
+  cornerBottomLeft: {fileID: 4424386618607359101}
+  cornerBottomRight: {fileID: 8447796867163126741}
   floorRenderer: {fileID: 4037747726847920816}
 --- !u!61 &7839993133050089833
 BoxCollider2D:

@@ -1,12 +1,12 @@
 using UnityEngine;
 using System.Collections.Generic;
+using System.Linq;
 using TMPro;
 
-// Waits for a maze to finish generating, highlights the 4 corners as
-// selectable, and on tap: spawns the player there, picks the farthest
-// corner as the exit (via BFS through the maze's open walls), and starts
-// the timer. This is what makes "player picks any corner" work correctly
-// regardless of which corner they choose.
+// Picks the EXIT corner FIRST (before the player chooses anything) and
+// marks it immediately - it never changes afterward. The other 3 corners
+// are shown as selectable starting points; the exit corner is excluded
+// from that list entirely, so it can never accidentally be picked as start.
 public class MazeCornerSelector : MonoBehaviour
 {
     [Tooltip("Optional - a HUD text object shown while the player is choosing a starting corner")]
@@ -14,15 +14,10 @@ public class MazeCornerSelector : MonoBehaviour
 
     public void SetHintText(TMP_Text text) => hintText = text;
 
-    List<Room> corners = new List<Room>();
+    List<Room> startOptions = new List<Room>();
+    Room exitRoom;
     bool selectionActive = false;
 
-    // IMPORTANT: subscribing in Start() instead of OnEnable(). Unity does
-    // NOT guarantee that GenerateMaze's Awake() has already run by the time
-    // this object's OnEnable() runs - so GenerateMaze.Instance could still
-    // be null there, silently skipping the subscription forever. Start()
-    // is guaranteed to run only after every object's Awake() has finished,
-    // so GenerateMaze.Instance is always ready by then.
     void Start()
     {
         if (GenerateMaze.Instance != null)
@@ -39,16 +34,26 @@ public class MazeCornerSelector : MonoBehaviour
 
     void BeginSelection()
     {
-        corners = GenerateMaze.Instance.GetCorners();
+        var allCorners = GenerateMaze.Instance.GetCorners();
+
+        // Fix the exit FIRST and mark it immediately - it never gets
+        // recomputed or reassigned after this point.
+        exitRoom = allCorners[Random.Range(0, allCorners.Count)];
+        exitRoom.ShowAsExit(true);
+
+        // The remaining 3 corners are the only selectable starting points -
+        // the exit corner is never offered, so it can't be picked as start.
+        startOptions = allCorners.Where(c => c != exitRoom).ToList();
         selectionActive = true;
 
-        if (hintText != null)
+        bool hintsEnabled = PlayerPrefs.GetInt("TutorialHintsEnabled", 1) == 1;
+        if (hintText != null && hintsEnabled)
         {
             hintText.text = "Tap a glowing corner to start!";
             hintText.gameObject.SetActive(true);
         }
 
-        foreach (var c in corners)
+        foreach (var c in startOptions)
         {
             c.ShowAsCornerOption(true);
             c.OnClicked += OnCornerClicked;
@@ -57,24 +62,18 @@ public class MazeCornerSelector : MonoBehaviour
 
     void OnCornerClicked(Room chosen)
     {
-        if (!selectionActive || !corners.Contains(chosen)) return;
+        if (!selectionActive || !startOptions.Contains(chosen)) return;
         selectionActive = false;
 
-        foreach (var c in corners)
+        foreach (var c in startOptions)
         {
             c.ShowAsCornerOption(false);
             c.OnClicked -= OnCornerClicked;
         }
 
-        Room exit = PickFarthestCorner(chosen);
-        exit.ShowAsExit(true);
-
-        // Timer + hint update FIRST, so even if something goes wrong spawning
-        // the player, you still see the exit marked and the timer running -
-        // makes bugs visible/debuggable instead of silently freezing the UI.
         if (ScoreManager.Instance != null)
         {
-            ScoreManager.Instance.SetExit(exit);
+            ScoreManager.Instance.SetExit(exitRoom);
             ScoreManager.Instance.StartTimer();
         }
         else
@@ -82,7 +81,8 @@ public class MazeCornerSelector : MonoBehaviour
             Debug.LogError("MazeCornerSelector: ScoreManager.Instance is null - is the ScoreManager component in the scene and enabled?");
         }
 
-        if (hintText != null)
+        bool hintsEnabled = PlayerPrefs.GetInt("TutorialHintsEnabled", 1) == 1;
+        if (hintText != null && hintsEnabled)
         {
             hintText.text = "Find the flagged exit - go!";
             StartCoroutine(HideHintAfterDelay(2f));
@@ -102,53 +102,5 @@ public class MazeCornerSelector : MonoBehaviour
     {
         yield return new WaitForSeconds(delay);
         if (hintText != null) hintText.gameObject.SetActive(false);
-    }
-
-    Room PickFarthestCorner(Room start)
-    {
-        Room best = null;
-        int bestDist = -1;
-
-        foreach (var corner in corners)
-        {
-            if (corner == start) continue;
-            int dist = BFSDistance(start, corner);
-            if (dist > bestDist)
-            {
-                bestDist = dist;
-                best = corner;
-            }
-        }
-
-        return best;
-    }
-
-    int BFSDistance(Room from, Room to)
-    {
-        var visited = new HashSet<Vector2Int>();
-        var queue = new Queue<(Room room, int dist)>();
-        queue.Enqueue((from, 0));
-        visited.Add(from.Index);
-
-        while (queue.Count > 0)
-        {
-            var (room, dist) = queue.Dequeue();
-            if (room.Index == to.Index) return dist;
-
-            foreach (Room.Directions dir in System.Enum.GetValues(typeof(Room.Directions)))
-            {
-                if (dir == Room.Directions.NONE) continue;
-                if (room.HasWall(dir)) continue;
-
-                Vector2Int next = room.Index + Room.Delta(dir);
-                Room nextRoom = GenerateMaze.Instance.GetRoom(next.x, next.y);
-                if (nextRoom == null || visited.Contains(next)) continue;
-
-                visited.Add(next);
-                queue.Enqueue((nextRoom, dist + 1));
-            }
-        }
-
-        return 0;
     }
 }

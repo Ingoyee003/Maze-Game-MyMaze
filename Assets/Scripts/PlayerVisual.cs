@@ -25,6 +25,7 @@ public class PlayerVisual : MonoBehaviour
     [SerializeField] float sparkleSpeed = 2f;
 
     SpriteRenderer spriteRenderer;
+    SpriteRenderer glowRenderer;
     TrailRenderer trail;
     ParticleSystem sparkles;
 
@@ -34,8 +35,22 @@ public class PlayerVisual : MonoBehaviour
         spriteRenderer.sprite = GenerateCircleSprite(textureSize, bodyColor);
         spriteRenderer.sortingOrder = 3;
 
+        SetupGlow();
         SetupTrail();
         SetupSparkles();
+    }
+
+    // A soft glow halo behind the player - this is what makes it feel "lit"
+    // instead of a flat colored dot.
+    void SetupGlow()
+    {
+        GameObject glowObj = new GameObject("Glow");
+        glowObj.transform.SetParent(transform, false);
+        glowObj.transform.localScale = Vector3.one * 2.2f;
+
+        glowRenderer = glowObj.AddComponent<SpriteRenderer>();
+        glowRenderer.sprite = RoundedUI.CreateGlowSprite(128, new Color(bodyColor.r, bodyColor.g, bodyColor.b, 0.55f));
+        glowRenderer.sortingOrder = 2; // just behind the body
     }
 
     // Draws a filled circle into a Texture2D with a soft antialiased edge,
@@ -140,6 +155,7 @@ public class PlayerVisual : MonoBehaviour
     public void SetVisible(bool visible)
     {
         if (spriteRenderer != null) spriteRenderer.enabled = visible;
+        if (glowRenderer != null) glowRenderer.enabled = visible;
         if (trail != null) trail.enabled = visible;
     }
 
